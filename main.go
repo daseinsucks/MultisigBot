@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	union "github.com/MoonSHRD/IKY-telegram-bot/artifacts"
+	//union "github.com/daseinsucks/MultisigBot/artifacts"
 
 	//passport "IKY-telegram-bot/artifacts/TGPassport"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"

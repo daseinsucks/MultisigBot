@@ -8,7 +8,6 @@ import (
 
 	//"math"
 	"os"
-	"strconv"
 
 	union "github.com/MoonSHRD/IKY-telegram-bot/artifacts"
 	//union "github.com/daseinsucks/MultisigBot/artifacts"
@@ -31,7 +30,7 @@ var nullAddress common.Address = common.HexToAddress("0x000000000000000000000000
 
 //to operate the bot, put a text file containing key for your bot acquired from telegram "botfather" to the same directory with this file
 var tgApiKey, err = os.ReadFile(".secret")
-var bot, error1 = tgbotapi.NewBotAPI(string(tgApiKey))
+var bot, _ = tgbotapi.NewBotAPI(string(tgApiKey))
 
 type user struct {
 	tgid          int64
@@ -41,13 +40,6 @@ type user struct {
 
 //main database for dialogs, key (int64) is telegram user id
 var userDatabase = make(map[int64]user) // consider to change in persistend data storage?
-
-var msgTemplates = make(map[string]string)
-
-var myenv map[string]string
-
-// file with settings for enviroment
-const envLoc = ".env"
 
 func main() {
 
@@ -85,7 +77,7 @@ func main() {
 	fmt.Printf("Balance of the validator bot: %d\n", balance)
 
 	// Setting up Union
-	union, err := union.NewUnion(common.HexToAddress("0x9024cF0a889233Af1fd4afaF949d5aF8C633D7fc"), client)
+	union, err := union.NewUnionCaller(common.HexToAddress("0x9c6C6CBDA53E72A6e25C5F9AcE5b1Ef87Ac8635b"), client)
 	if err != nil {
 		log.Fatalf("Failed to instantiate a Union contract: %v", err)
 	}
@@ -108,32 +100,59 @@ func main() {
 				isRegistered := checkDao(auth, union, update.Message.Chat.ID)
 				if isRegistered {
 					if updateDb, ok := userDatabase[update.Message.From.ID]; ok {
-
 						updateDb.dialog_status = 1
+						userDatabase[update.Message.From.ID] = updateDb
+					}
+				} else {
+					msg := tgbotapi.NewMessage(userDatabase[update.Message.From.ID].tgid, "Your Union is not registered yet! \n Please register it at <unionbot>")
+					bot.Send(msg)
+					if updateDb, ok := userDatabase[update.Message.From.ID]; ok {
+						updateDb.dialog_status = 0
 						userDatabase[update.Message.From.ID] = updateDb
 					}
 				}
 
 			} else {
 
+				switch userDatabase[update.Message.From.ID].dialog_status {
+
+				//first check for user status, (for a new user status 0 is set automatically), then user reply for the first bot message is logged to a database as name AND user status is updated
+				case 0:
+					isRegistered := checkDao(auth, union, update.Message.Chat.ID)
+					if isRegistered {
+						if updateDb, ok := userDatabase[update.Message.From.ID]; ok {
+							updateDb.dialog_status = 1
+							userDatabase[update.Message.From.ID] = updateDb
+						}
+					} else {
+						msg := tgbotapi.NewMessage(userDatabase[update.Message.From.ID].tgid, "Your Union is not registered yet! \n Please register it at <unionbot>")
+						bot.Send(msg)
+					}
+
+					//all other logic may be implemented here
+
+				}
 			}
 		}
 	}
 }
 
-func checkDao(auth *bind.TransactOpts, pc *union.Union, tgid int64) bool {
+func checkDao(auth *bind.TransactOpts, pc *union.UnionCaller, tgid int64) bool {
 
-	str := strconv.FormatInt(tgid, 10)
-	registration, err := pc.DaoAddresses(nil, str)
+	registration, err := pc.DaoAddresses(&bind.CallOpts{
+		From:    auth.From,
+		Context: context.Background(),
+	}, tgid)
+
+	log.Println(registration)
 
 	if err != nil {
-		log.Println("Can't check dao")
 		log.Print(err)
 	}
+
 	if registration == nullAddress {
 		return false
 	} else {
 		return true
 	}
-
 }

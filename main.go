@@ -4,20 +4,20 @@ import (
 	"context"
 	"fmt"
 	"log"
-
 	"math/big"
 
 	//"math"
-
 	"os"
+	"strconv"
 
 	union "github.com/MoonSHRD/IKY-telegram-bot/artifacts"
-	//passport "IKY-telegram-bot/artifacts/TGPassport"
 
+	//passport "IKY-telegram-bot/artifacts/TGPassport"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/joho/godotenv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -26,6 +26,7 @@ var mainKeyboard = tgbotapi.NewReplyKeyboard(
 	tgbotapi.NewKeyboardButtonRow(
 		tgbotapi.NewKeyboardButton("Verify personal wallet")),
 )
+var nullAddress common.Address = common.HexToAddress("0x0000000000000000000000000000000000000000")
 
 //to operate the bot, put a text file containing key for your bot acquired from telegram "botfather" to the same directory with this file
 var tgApiKey, err = os.ReadFile(".secret")
@@ -49,9 +50,10 @@ const envLoc = ".env"
 
 func main() {
 
-	loadEnv()
+	_ = godotenv.Load()
 	ctx := context.Background()
-	pk := myenv["PK"] // load private key from env
+	pk := os.Getenv("PK") // load private key from env
+	gateway := os.Getenv("GATEWAY_RINKEBY_WS")
 
 	bot, err = tgbotapi.NewBotAPI(string(tgApiKey))
 	if err != nil {
@@ -60,7 +62,7 @@ func main() {
 
 	// Connecting to blockchain network
 	//  client, err := ethclient.Dial(os.Getenv("GATEWAY"))	// for global env config
-	client, err := ethclient.Dial(myenv["GATEWAY_RINKEBY_WS"]) // load from local .env file
+	client, err := ethclient.Dial(gateway) // load from local .env file
 	if err != nil {
 		log.Fatalf("could not connect to Ethereum gateway: %v\n", err)
 	}
@@ -82,26 +84,9 @@ func main() {
 	fmt.Printf("Balance of the validator bot: %d\n", balance)
 
 	// Setting up Union
-	unionInfo, err := union.NewUnion(common.HexToAddress("0x9024cF0a889233Af1fd4afaF949d5aF8C633D7fc"), client)
+	union, err := union.NewUnion(common.HexToAddress("0x9024cF0a889233Af1fd4afaF949d5aF8C633D7fc"), client)
 	if err != nil {
 		log.Fatalf("Failed to instantiate a Union contract: %v", err)
-	}
-
-	// Wrap the Passport contract instance into a session
-	session := &union.UnionSession{
-		Contract: unionInfo,
-		CallOpts: bind.CallOpts{
-			Pending: true,
-			From:    auth.From,
-			Context: context.Background(),
-		},
-		TransactOpts: bind.TransactOpts{
-			From:     auth.From,
-			Signer:   auth.Signer,
-			GasLimit: 0,   // 0 automatically estimates gas limit
-			GasPrice: nil, // nil automatically suggests gas price
-			Context:  context.Background(),
-		},
 	}
 
 	log.Printf("session with union initialized")
@@ -119,7 +104,7 @@ func main() {
 		if update.Message != nil {
 			if _, ok := userDatabase[update.Message.From.ID]; !ok {
 				userDatabase[update.Message.From.ID] = user{update.Message.Chat.ID, update.Message.Chat.UserName, 0}
-				isRegistered := checkDao(auth, unionInfo, update.Message.Chat.ID)
+				isRegistered := checkDao(auth, union, update.Message.Chat.ID)
 				if isRegistered {
 					if updateDb, ok := userDatabase[update.Message.From.ID]; ok {
 
@@ -129,32 +114,22 @@ func main() {
 				}
 
 			} else {
+
 			}
 		}
 	}
 }
 
-func checkDao(auth *bind.TransactOpts, pc *union.Union, tgid uint64) bool {
+func checkDao(auth *bind.TransactOpts, pc *union.Union, tgid int64) bool {
 
-	registration, err := pc.DaoAdresses(
-		&bind.TransactOpts{
-			From:      auth.From,
-			Nonce:     nil,
-			Signer:    auth.Signer,
-			Value:     big.NewInt(0),
-			GasPrice:  nil,
-			GasFeeCap: nil,
-			GasTipCap: nil,
-			GasLimit:  0,
-			Context:   context.Background(),
-		}, tgid,
-	)
+	str := strconv.FormatInt(tgid, 10)
+	registration, err := pc.DaoAddresses(nil, str)
 
 	if err != nil {
 		log.Println("Can't check dao")
 		log.Print(err)
 	}
-	if registration == 0x0000000000000000000000000000000000000000 {
+	if registration == nullAddress {
 		return false
 	} else {
 		return true

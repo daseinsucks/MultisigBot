@@ -48,14 +48,14 @@ func main() {
 	}
 	defer client.Close()
 
-	union, err := union.NewUnionCaller(common.HexToAddress("0x9024cF0a889233Af1fd4afaF949d5aF8C633D7fc"), client)
+	union, err := union.NewUnionCaller(common.HexToAddress("0x9c6C6CBDA53E72A6e25C5F9AcE5b1Ef87Ac8635b"), client)
 	if err != nil {
 		log.Fatalf("Failed to instantiate a Union contract: %v", err)
 	}
 	log.Printf("session with union initialized")
-
-	//test := big.NewInt(17236213761)
-	version, err := union.GetDaoAddressbyChatId(nil, 1238723645)
+	//for tests - tgid 12345 should print address 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+	var test int64 = 12345
+	version, err := union.DaoAddresses(nil, test)
 	if err != nil {
 		log.Print(err)
 	}
@@ -63,3 +63,6 @@ func main() {
 	log.Println(version)
 
 }
+
+//passport 0xd8d32BB03ED024757Ad6f8585ee5973910328Cc6
+//Union deployed to: 0x9c6C6CBDA53E72A6e25C5F9AcE5b1Ef87Ac8635b
